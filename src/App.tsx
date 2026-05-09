@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import PokerSolver from 'pokersolver';
+import * as PokerSolver from 'pokersolver';
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
