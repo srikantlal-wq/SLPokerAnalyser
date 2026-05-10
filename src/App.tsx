@@ -37,45 +37,83 @@ export default function App() {
   const calculateRealOdds = (hand: string[], board: string[]) => {
     try {
       if (hand.length < 2) return 0;
-      const hGroup = CardGroup.fromString(hand.join(''));
-      const bGroup = board.length > 0 ? CardGroup.fromString(board.join('')) : undefined;
-      const result = OddsCalculator.calculate([hGroup], bGroup);
-      return Math.round(result.equities[0].getEquity());
-    } catch (e) { return 0; }
+  
+      const allRanks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+      const allSuits = ['s', 'h', 'd', 'c'];
+      const fullDeck = allRanks.flatMap(r => allSuits.map(s => `${r}${s}`));
+  
+      const takenCards = [...hand, ...board];
+      // Shuffle the remaining deck to ensure the Ghost Hand is random
+      const remainingDeck = fullDeck
+        .filter(c => !takenCards.includes(c))
+        .sort(() => Math.random() - 0.5);
+  
+      // Give the opponent 2 random cards
+      const ghostHand = [remainingDeck[0], remainingDeck[1]];
+  
+      const playerGroup = CardGroup.fromString(hand.join(''));
+      const opponentGroup = CardGroup.fromString(ghostHand.join(''));
+      const boardGroup = board.length > 0 ? CardGroup.fromString(board.join('')) : undefined;
+  
+      // Run the calculation for 2 players
+      const result = OddsCalculator.calculate([playerGroup, opponentGroup], boardGroup, undefined, 1000);
+      
+      // We explicitly take the equity of the FIRST group (the playerGroup)
+      const myEquity = result.equities[0].getEquity();
+      
+      return Math.round(myEquity);
+    } catch (e) {
+      console.error("Math Error:", e);
+      return 0;
+    }
   };
-
+  
   const analyzeHand = async () => {
+    if (mode === 'photo' && !image) return alert("Upload a photo first!");
     setLoading(true);
+  
     try {
       let finalData;
+  
+      // 1. Get the data based on the mode
       if (mode === 'photo') {
-        if (!image) throw new Error("No image");
-        const res = await fetch('/api/analyze', {
+        const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image }),
         });
-        finalData = await res.json();
+        finalData = await response.json();
       } else {
         finalData = { hand: manualHand, board: manualBoard };
       }
-
+  
+      // 2. THE MATH HAPPENS HERE
+      // We pass the hand and board to your new "Ghost Hand" math function
+      const probability = calculateRealOdds(finalData.hand, finalData.board);
+  
+      // 3. GET THE DESCRIPTION
       const solved = PokerSolver.Hand.solve([...finalData.hand, ...finalData.board]);
+  
+      // 4. UPDATE THE UI
       setResults({
         hand: solved.descr,
-        winProb: calculateRealOdds(finalData.hand, finalData.board),
+        winProb: probability, // Using the new math result here
         rawCards: finalData
       });
+  
     } catch (error) {
-      alert("Analysis failed. Check your API key or image size.");
-    } finally { setLoading(false); }
+      console.error("Vibe Error:", error);
+      alert("Analysis failed.");
+    } finally {
+      setLoading(false);
+    }
   };
-
+  
   return (
     <div style={{ backgroundColor: '#F3F4F6', minHeight: '100vh', padding: '20px', fontFamily: 'Inter, sans-serif' }}>
       <main style={{ maxWidth: '440px', margin: '0 auto', background: 'white', borderRadius: '28px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
         
-        <h1 style={{ fontWeight: '900', letterSpacing: '-1.5px', fontSize: '24px', marginBottom: '20px' }}>POKER VIBE 2.0</h1>
+        <h1 style={{ fontWeight: '900', letterSpacing: '-1.5px', fontSize: '24px', marginBottom: '20px' }}>POKER VIBE 2.5</h1>
 
         {/* Tab Switcher */}
         <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: '14px', padding: '4px', marginBottom: '24px' }}>
