@@ -17,24 +17,53 @@ export default function App() {
   };
 
   // 2. Logic to process the "Easy Way" (Mocking the AI call)
-  const analyzeHand = async () => {
-    setLoading(true);
-    // Here is where you'd call your GPT-4o Vision API
-    // For now, let's simulate the AI returning: My Hand: As, Ad | Board: 2h, 7d, Jc
-    setTimeout(() => {
-      const myHand = PokerSolver.Hand.solve(['As', 'Ad', '2h', '7d', 'Jc']);
-      setResults({
-        hand: myHand.descr, // e.g., "Pair, Aces"
-        winProb: 82.5,     // We'll calculate this in Phase 3
-      });
-      setLoading(false);
-    }, 1500);
-  };
+ // 1. Make sure your function is marked as 'async'
+const analyzeHand = async () => {
+  if (!image) {
+    alert("Please upload or take a photo first!");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // 2. This is the 'fetch' call that hits your /api/analyze.ts file
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ image }), // Sending the base64 photo
+    });
+
+    if (!response.ok) throw new Error('API request failed');
+
+    const data = await response.json(); 
+    // data looks like: { hand: ['As', 'Ad'], board: ['2h', '7d', 'Jc'] }
+
+    // 3. Use 'pokersolver' to describe the hand strength
+    // We combine the hand and board cards into one array for the solver
+    const combinedCards = [...data.hand, ...data.board];
+    const solvedHand = PokerSolver.Hand.solve(combinedCards);
+
+    // 4. Update the UI state with the real data
+    setResults({
+      hand: solvedHand.descr, // e.g., "Full House, Aces over Kings"
+      winProb: 75.4,          // For now, we can hardcode this or add the math next!
+    });
+
+  } catch (error) {
+    console.error("Vibe Check Error:", error);
+    alert("Check your Gemini API key in Vercel settings!");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={{ backgroundColor: 'white', minHeight: '100vh', padding: '40px', fontFamily: 'sans-serif' }}>
       <header style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ fontWeight: '800', letterSpacing: '-1px' }}>POKER VIBE</h1>
+        <h1 style={{ fontWeight: '800', letterSpacing: '-1px' }}>POKER VIBE 1.0</h1>
         <p style={{ color: '#666' }}>Snap a photo, get the math.</p>
       </header>
 
