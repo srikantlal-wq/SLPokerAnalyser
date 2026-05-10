@@ -20,7 +20,7 @@ export default function App() {
     try {
       if (hand.length < 2) return 0;
       const playerGroup = CardGroup.fromString(hand.join(''));
-      const boardGroup = board.length > 0 ? CardGroup.fromString(board.join('')) : null;
+      const boardGroup = board.length > 0 ? CardGroup.fromString(board.join('')) : undefined;
       
       const result = OddsCalculator.calculate([playerGroup], boardGroup);
       return Math.round(result.equities[0].getEquity());
