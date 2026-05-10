@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import * as PokerSolver from 'pokersolver';
+import { CardGroup, OddsCalculator } from 'poker-odds-calculator';
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState({ hand: '', winProb: 0 });
+  const [results, setResults] = useState({ hand: '', winProb: 0, rawCards: { hand: [], board: [] } });
 
-  // 1. Function to handle the Photo
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -16,79 +16,99 @@ export default function App() {
     }
   };
 
-  // 2. Logic to process the "Easy Way" (Mocking the AI call)
- // 1. Make sure your function is marked as 'async'
-const analyzeHand = async () => {
-  if (!image) {
-    alert("Please upload or take a photo first!");
-    return;
-  }
+  const calculateRealOdds = (hand: string[], board: string[]) => {
+    try {
+      if (hand.length < 2) return 0;
+      const playerGroup = CardGroup.fromString(hand.join(''));
+      const boardGroup = board.length > 0 ? CardGroup.fromString(board.join('')) : null;
+      
+      const result = OddsCalculator.calculate([playerGroup], boardGroup);
+      return Math.round(result.equities[0].getEquity());
+    } catch (e) {
+      console.error("Math Error:", e);
+      return 0;
+    }
+  };
 
-  setLoading(true);
+  const analyzeHand = async () => {
+    if (!image) return alert("Upload a photo first!");
+    setLoading(true);
 
-  try {
-    // 2. This is the 'fetch' call that hits your /api/analyze.ts file
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ image }), // Sending the base64 photo
-    });
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image }),
+      });
 
-    if (!response.ok) throw new Error('API request failed');
+      const data = await response.json(); // { hand: ['Ah', 'Ad'], board: ['2h', '7s'] }
 
-    const data = await response.json(); 
-    // data looks like: { hand: ['As', 'Ad'], board: ['2h', '7d', 'Jc'] }
+      const solvedHand = PokerSolver.Hand.solve([...data.hand, ...data.board]);
+      const probability = calculateRealOdds(data.hand, data.board);
 
-    // 3. Use 'pokersolver' to describe the hand strength
-    // We combine the hand and board cards into one array for the solver
-    const combinedCards = [...data.hand, ...data.board];
-    const solvedHand = PokerSolver.Hand.solve(combinedCards);
-
-    // 4. Update the UI state with the real data
-    setResults({
-      hand: solvedHand.descr, // e.g., "Full House, Aces over Kings"
-      winProb: 75.4,          // For now, we can hardcode this or add the math next!
-    });
-
-  } catch (error) {
-    console.error("Vibe Check Error:", error);
-    alert("Check your Gemini API key in Vercel settings!");
-  } finally {
-    setLoading(false);
-  }
-};
+      setResults({
+        hand: solvedHand.descr,
+        winProb: probability,
+        rawCards: data
+      });
+    } catch (error) {
+      alert("Check your Gemini API Key in Vercel!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{ backgroundColor: 'white', minHeight: '100vh', padding: '40px', fontFamily: 'sans-serif' }}>
-      <header style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ fontWeight: '800', letterSpacing: '-1px' }}>POKER VIBE 1.0</h1>
-        <p style={{ color: '#666' }}>Snap a photo, get the math.</p>
-      </header>
+    <div style={{ backgroundColor: '#F9FAFB', minHeight: '100vh', padding: '40px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <main style={{ maxWidth: '480px', margin: '0 auto', background: 'white', padding: '30px', borderRadius: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '-1px', marginBottom: '8px' }}>POKER VIBE 2.0</h1>
+        <p style={{ color: '#6B7280', marginBottom: '32px' }}>AI-Powered Odds Evaluator</p>
 
-      <main style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
-        {/* Upload Zone */}
-        <div style={{ border: '2px dashed #eee', padding: '20px', borderRadius: '12px' }}>
-          <input type="file" accept="image/*" onChange={handleUpload} />
-          {image && <img src={image} style={{ width: '100%', marginTop: '20px', borderRadius: '8px' }} />}
+        
+        <div style={{ border: '2px dashed #E5E7EB', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
+          <input type="file" accept="image/*" onChange={handleUpload} style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer' }} />
+          {image ? (
+            <img src={image} style={{ width: '100%', display: 'block' }} />
+          ) : (
+            <div style={{ padding: '60px 20px', color: '#9CA3AF' }}>Tap to upload hand photo</div>
+          )}
         </div>
 
         <button 
           onClick={analyzeHand}
-          style={{ width: '100%', padding: '15px', background: 'black', color: 'white', borderRadius: '8px', marginTop: '20px', cursor: 'pointer' }}
+          disabled={loading}
+          style={{ 
+            width: '100%', padding: '18px', background: 'black', color: 'white', 
+            borderRadius: '14px', marginTop: '24px', fontWeight: '700', fontSize: '16px',
+            border: 'none', cursor: 'pointer', opacity: loading ? 0.6 : 1, transition: '0.2s'
+          }}
         >
-          {loading ? 'Analyzing...' : 'CALCULATE ODDS'}
+          {loading ? 'AI IS THINKING...' : 'CALCULATE EQUITY'}
         </button>
 
-        {/* Results Dashboard */}
+        
         {results.hand && (
-          <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-            <h2 style={{ fontSize: '14px', color: '#888', textTransform: 'uppercase' }}>Current Hand</h2>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{results.hand}</p>
+          <div style={{ marginTop: '32px', textAlign: 'left', animation: 'fadeIn 0.5s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '700', textTransform: 'uppercase' }}>Current Hand</span>
+                <p style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>{results.hand}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '700', textTransform: 'uppercase' }}>Win Prob</span>
+                <p style={{ 
+                  fontSize: '32px', fontWeight: '900', 
+                  color: results.winProb > 60 ? '#10B981' : results.winProb > 35 ? '#F59E0B' : '#EF4444' 
+                }}>
+                  {results.winProb}%
+                </p>
+              </div>
+            </div>
             
-            <h2 style={{ fontSize: '14px', color: '#888', textTransform: 'uppercase', marginTop: '20px' }}>Win Probability</h2>
-            <p style={{ fontSize: '48px', fontWeight: '900', color: '#00C853' }}>{results.winProb}%</p>
+            
+            <div style={{ marginTop: '20px', padding: '15px', background: '#F3F4F6', borderRadius: '12px', fontSize: '14px' }}>
+              <strong>Detected:</strong> {results.rawCards.hand.join(', ')} | {results.rawCards.board.join(', ')}
+            </div>
           </div>
         )}
       </main>
