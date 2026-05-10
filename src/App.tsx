@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import * as PokerSolver from 'pokersolver';
 import { CardGroup, OddsCalculator } from 'poker-odds-calculator';
 
