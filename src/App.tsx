@@ -71,7 +71,7 @@ export default function App() {
       let finalData;
       if (mode === 'photo') {
         if (!image) throw new Error("No image");
-        const res = await fetch('/api/analyze', {
+        const res = await fetch('./api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image }),
